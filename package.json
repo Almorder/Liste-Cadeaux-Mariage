@@ -1,9 +1,9 @@
 {
   "name": "liste-cadeaux-mariage-myriam-nolan",
-  "version": "2.5.0",
+  "version": "3.0.0",
   "private": true,
   "type": "module",
-  "description": "Liste de mariage de Myriam et Nolan avec espace administrateur privé sur Vercel.",
+  "description": "Liste de mariage avec stockage Vercel Blob append-only sans conflit ETag.",
   "engines": {
     "node": "24.x"
   },

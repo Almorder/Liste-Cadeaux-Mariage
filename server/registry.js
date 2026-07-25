@@ -1,20 +1,27 @@
-import { BlobPreconditionFailedError, get, head, put } from '@vercel/blob';
+import crypto from 'node:crypto';
+import { get, list, put } from '@vercel/blob';
 import seed from '../data/seed.js';
 import { blobAuthOptions } from './blob-auth.js';
 
-const REGISTRY_PATH = 'registry/state.json';
+const LEGACY_REGISTRY_PATH = 'registry/state.json';
+const EVENTS_PREFIX = 'events/';
 const ACCESS = 'private';
+const LIST_LIMIT = 1000;
+const READ_CONCURRENCY = 12;
 
-function cloneSeed() {
-  const value = structuredClone(seed);
-  value.updatedAt = new Date().toISOString();
-  return value;
+function clone(value) {
+  return structuredClone(value);
 }
 
 function blobOptions(extra = {}) {
-  // Ne pas forcer de credential ici : le SDK choisit automatiquement
-  // l'OIDC Vercel moderne ou BLOB_READ_WRITE_TOKEN pour les anciens stores.
   return { access: ACCESS, ...blobAuthOptions(), ...extra };
+}
+
+function isMissingBlobError(error) {
+  const status = Number(error?.statusCode || error?.status || error?.response?.status || 0);
+  const code = String(error?.code || error?.name || '').toLowerCase();
+  const message = String(error?.message || '').toLowerCase();
+  return status === 404 || code.includes('notfound') || code.includes('not_found') || message.includes('not found') || message.includes('does not exist');
 }
 
 export function classifyStorageError(error) {
@@ -24,16 +31,16 @@ export function classifyStorageError(error) {
   if (status === 401 || status === 403 || /unauthor|forbidden|credential|token|oidc|access/.test(message)) {
     return {
       code: 'BLOB_AUTH',
-      message: 'Le Blob Store n’autorise pas encore ce déploiement. Connecte le projet au store ou active OIDC, puis redéploie.',
+      message: 'Le Blob Store n’autorise pas ce déploiement. Vérifie la connexion du projet au store, puis redéploie.',
     };
   }
   if (/private|public|access mode|access.*mismatch/.test(message)) {
     return {
       code: 'BLOB_ACCESS_MODE',
-      message: 'Le mode du Blob Store ne correspond pas au site. Le store doit être créé en mode Private.',
+      message: 'Le mode du Blob Store ne correspond pas au site. Le store doit être Private.',
     };
   }
-  if (status === 404 || /store.*not found|does not exist|unknown store/.test(message)) {
+  if (status === 404 || /store.*not found|unknown store/.test(message)) {
     return {
       code: 'BLOB_NOT_CONNECTED',
       message: 'Aucun Blob Store utilisable n’est connecté à ce projet Vercel en Production.',
@@ -45,155 +52,237 @@ export function classifyStorageError(error) {
   };
 }
 
-function isPreconditionFailedError(error) {
-  const status = Number(error?.statusCode || error?.status || error?.response?.status || 0);
-  const code = String(error?.code || error?.name || '').toLowerCase();
-  const message = String(error?.message || '').toLowerCase();
-  return (
-    error instanceof BlobPreconditionFailedError ||
-    status === 412 ||
-    code.includes('precondition') ||
-    code.includes('etag') ||
-    message.includes('precondition failed') ||
-    message.includes('etag mismatch') ||
-    message.includes('etag does not match')
-  );
-}
-
-function sleep(milliseconds) {
-  return new Promise((resolve) => setTimeout(resolve, milliseconds));
-}
-
-function isMissingBlobError(error) {
-  const status = Number(error?.statusCode || error?.status || error?.response?.status || 0);
-  const code = String(error?.code || error?.name || '').toLowerCase();
-  const message = String(error?.message || '').toLowerCase();
-  return status === 404 || code.includes('notfound') || code.includes('not_found') || message.includes('not found') || message.includes('does not exist');
-}
-
 export function blobConfigurationStatus() {
   return {
     hasToken: Boolean(process.env.BLOB_READ_WRITE_TOKEN),
     hasStoreId: Boolean(process.env.BLOB_STORE_ID),
     access: ACCESS,
-    registryPath: REGISTRY_PATH,
+    storageModel: 'append-only-events',
   };
 }
 
-async function readRegistryBlob(attempts = 5) {
+async function readJsonBlob(pathname) {
   try {
-    for (let attempt = 0; attempt < attempts; attempt += 1) {
-      // `useCache: false` garantit que le JSON lu vient de l'origine Blob.
-      // Pour l'écriture conditionnelle, Vercel recommande de récupérer l'ETag
-      // canonique avec `head()` plutôt que de dépendre uniquement de la réponse GET.
-      const result = await get(REGISTRY_PATH, blobOptions({ useCache: false }));
-      if (!result || result.statusCode === 404) return null;
-      if (result.statusCode !== 200 || !result.stream) {
-        throw new Error(`Lecture Blob inattendue (statut ${result.statusCode || 'inconnu'}).`);
-      }
-
-      const text = await new Response(result.stream).text();
-      const metadata = await head(REGISTRY_PATH, blobAuthOptions());
-      const getEtag = result.blob?.etag || null;
-      const headEtag = metadata?.etag || null;
-
-      // Dans le cas très rare où la ressource change entre GET et HEAD,
-      // on relit jusqu'à obtenir un contenu et un ETag de la même version.
-      if (getEtag && headEtag && getEtag !== headEtag) {
-        const backoff = 40 * (attempt + 1) + Math.floor(Math.random() * 40);
-        console.warn('REGISTRY_READ_VERSION_CHANGED', {
-          attempt: attempt + 1,
-          attempts,
-          backoff,
-        });
-        await sleep(backoff);
-        continue;
-      }
-
-      return {
-        state: JSON.parse(text),
-        etag: headEtag || getEtag,
-      };
+    const result = await get(pathname, blobOptions({ useCache: false }));
+    if (!result || result.statusCode === 404) return null;
+    if (result.statusCode !== 200 || !result.stream) {
+      throw new Error(`Lecture Blob inattendue pour ${pathname} (statut ${result.statusCode || 'inconnu'}).`);
     }
-
-    const conflict = new Error('Impossible de lire une version stable de la liste. Merci de réessayer.');
-    conflict.code = 'REGISTRY_READ_CONFLICT';
-    throw conflict;
+    const text = await new Response(result.stream).text();
+    return JSON.parse(text);
   } catch (error) {
     if (isMissingBlobError(error)) return null;
     throw error;
   }
 }
 
-async function initializeRegistry() {
-  const state = cloneSeed();
+async function readLegacyBase() {
   try {
-    const blob = await put(REGISTRY_PATH, JSON.stringify(state), blobOptions({
-      contentType: 'application/json; charset=utf-8',
-      cacheControlMaxAge: 60,
-      addRandomSuffix: false,
-      allowOverwrite: false,
-    }));
-    return { state, etag: blob?.etag || null };
+    const legacy = await readJsonBlob(LEGACY_REGISTRY_PATH);
+    if (legacy && Array.isArray(legacy.gifts)) return legacy;
   } catch (error) {
-    // Une autre fonction a pu initialiser le fichier entre-temps.
-    const existing = await readRegistryBlob();
-    if (existing) return existing;
-    throw error;
+    // Le fichier historique n'est plus utilisé pour les écritures. S'il est
+    // illisible, la liste repart proprement du seed embarqué dans le dépôt.
+    console.warn('LEGACY_REGISTRY_IGNORED', String(error?.message || error));
   }
+  return clone(seed);
+}
+
+async function listAll(prefix) {
+  const blobs = [];
+  let cursor;
+  do {
+    const page = await list({
+      ...blobAuthOptions(),
+      prefix,
+      limit: LIST_LIMIT,
+      ...(cursor ? { cursor } : {}),
+    });
+    blobs.push(...(page?.blobs || []));
+    cursor = page?.hasMore ? page.cursor : undefined;
+  } while (cursor);
+  return blobs;
+}
+
+async function mapLimit(items, limit, mapper) {
+  const results = new Array(items.length);
+  let nextIndex = 0;
+  async function worker() {
+    while (true) {
+      const index = nextIndex;
+      nextIndex += 1;
+      if (index >= items.length) return;
+      results[index] = await mapper(items[index], index);
+    }
+  }
+  await Promise.all(Array.from({ length: Math.min(limit, items.length || 1) }, () => worker()));
+  return results;
+}
+
+async function readEvents() {
+  const blobs = await listAll(EVENTS_PREFIX);
+  const events = await mapLimit(blobs, READ_CONCURRENCY, async (blob) => {
+    try {
+      const event = await readJsonBlob(blob.pathname);
+      return event ? { ...event, _pathname: blob.pathname } : null;
+    } catch (error) {
+      // Un événement isolé corrompu ne doit jamais rendre toute la liste indisponible.
+      console.error('EVENT_READ_IGNORED', blob.pathname, error);
+      return null;
+    }
+  });
+  return events
+    .filter(Boolean)
+    .sort((left, right) => {
+      const byDate = String(left.createdAt || '').localeCompare(String(right.createdAt || ''));
+      return byDate || String(left._pathname).localeCompare(String(right._pathname));
+    });
+}
+
+function upsertById(items, value) {
+  const index = items.findIndex((item) => item.id === value.id);
+  if (index >= 0) items[index] = value;
+  else items.push(value);
+}
+
+function applyEvent(state, event) {
+  switch (event.kind) {
+    case 'gift.upsert':
+      if (event.gift?.id) upsertById(state.gifts, clone(event.gift));
+      break;
+    case 'gift.delete':
+      state.gifts = state.gifts.filter((gift) => gift.id !== event.entityId);
+      break;
+    case 'settings.update':
+      state.settings = { ...state.settings, ...clone(event.settings || {}) };
+      break;
+    case 'commitment.upsert':
+      if (event.commitment?.id) upsertById(state.commitments, clone(event.commitment));
+      break;
+    case 'commitment.delete':
+      state.commitments = state.commitments.filter((item) => item.id !== event.entityId);
+      break;
+    case 'contact.upsert':
+      if (event.contact?.id) upsertById(state.contacts, clone(event.contact));
+      break;
+    case 'contact.delete':
+      state.contacts = state.contacts.filter((item) => item.id !== event.entityId);
+      break;
+    default:
+      break;
+  }
+  if (event.createdAt && String(event.createdAt) > String(state.updatedAt || '')) {
+    state.updatedAt = event.createdAt;
+  }
+}
+
+function normalizeState(input) {
+  const state = clone(input || seed);
+  state.gifts = Array.isArray(state.gifts) ? state.gifts : [];
+  state.commitments = Array.isArray(state.commitments) ? state.commitments : [];
+  state.contacts = Array.isArray(state.contacts) ? state.contacts : [];
+  state.settings = state.settings && typeof state.settings === 'object' ? state.settings : clone(seed.settings);
+  state.updatedAt = state.updatedAt || new Date().toISOString();
+  return state;
+}
+
+function recalculateAllGifts(state) {
+  const giftIds = new Set(state.commitments.map((item) => item.giftId).filter(Boolean));
+  for (const giftId of giftIds) recalculateGiftFromCommitments(state, giftId);
 }
 
 export async function readRegistry() {
-  // Compatible avec les deux modes Vercel : ancien token statique et OIDC.
-  // Le SDK gère l'authentification OIDC automatiquement dans les Functions.
-  return (await readRegistryBlob()) || initializeRegistry();
+  const [base, events] = await Promise.all([readLegacyBase(), readEvents()]);
+  const state = normalizeState(base);
+  for (const event of events) applyEvent(state, event);
+  recalculateAllGifts(state);
+  return { state, etag: null };
 }
 
-async function writeRegistry(state, etag) {
-  state.updatedAt = new Date().toISOString();
-  return put(REGISTRY_PATH, JSON.stringify(state), blobOptions({
+function stableJson(value) {
+  return JSON.stringify(value);
+}
+
+function changed(left, right) {
+  return stableJson(left) !== stableJson(right);
+}
+
+function byId(items) {
+  return new Map((items || []).map((item) => [item.id, item]));
+}
+
+function eventPath(scope, entityId, createdAt) {
+  const safeId = String(entityId || 'global').replace(/[^a-zA-Z0-9._-]/g, '_').slice(0, 120);
+  const stamp = new Date(createdAt).toISOString().replace(/[:.]/g, '-');
+  return `${EVENTS_PREFIX}${scope}/${safeId}/${stamp}-${crypto.randomUUID()}.json`;
+}
+
+async function writeEvent(scope, entityId, payload) {
+  const createdAt = new Date().toISOString();
+  const event = { version: 1, createdAt, ...payload };
+  const pathname = eventPath(scope, entityId, createdAt);
+  await put(pathname, JSON.stringify(event), blobOptions({
     contentType: 'application/json; charset=utf-8',
-    cacheControlMaxAge: 60,
     addRandomSuffix: false,
-    allowOverwrite: true,
-    ...(etag ? { ifMatch: etag } : {}),
   }));
+  return event;
 }
 
-export async function updateRegistry(mutator, attempts = 12) {
-  let lastError;
-  for (let attempt = 0; attempt < attempts; attempt += 1) {
-    const { state, etag } = await readRegistry();
-    const draft = structuredClone(state);
-    const result = await mutator(draft);
-    try {
-      await writeRegistry(draft, etag);
-      return { state: draft, result };
-    } catch (error) {
-      if (!isPreconditionFailedError(error)) throw error;
-
-      lastError = error;
-      // Une autre Function a écrit entre notre lecture et notre écriture.
-      // On relit l'état le plus récent puis on rejoue la mutation.
-      const backoff = Math.min(1200, 60 * (2 ** attempt)) + Math.floor(Math.random() * 90);
-      console.warn('REGISTRY_ETAG_CONFLICT_RETRY', {
-        attempt: attempt + 1,
-        attempts,
-        backoff,
-      });
-      await sleep(backoff);
+function collectEntityEvents(beforeItems, afterItems, kindPrefix, fieldName, scope) {
+  const writes = [];
+  const before = byId(beforeItems);
+  const after = byId(afterItems);
+  for (const [id, value] of after) {
+    if (!before.has(id) || changed(before.get(id), value)) {
+      writes.push(writeEvent(scope, id, {
+        kind: `${kindPrefix}.upsert`,
+        entityId: id,
+        [fieldName]: clone(value),
+      }));
     }
   }
+  for (const id of before.keys()) {
+    if (!after.has(id)) {
+      writes.push(writeEvent(scope, id, {
+        kind: `${kindPrefix}.delete`,
+        entityId: id,
+      }));
+    }
+  }
+  return writes;
+}
 
-  const conflict = new Error('La liste vient d’être modifiée par une autre personne. Merci de réessayer dans un instant.');
-  conflict.code = 'REGISTRY_WRITE_CONFLICT';
-  conflict.cause = lastError;
-  throw conflict;
+async function persistDiff(before, after) {
+  const writes = [
+    ...collectEntityEvents(before.gifts, after.gifts, 'gift', 'gift', 'gifts'),
+    ...collectEntityEvents(before.commitments, after.commitments, 'commitment', 'commitment', 'commitments'),
+    ...collectEntityEvents(before.contacts, after.contacts, 'contact', 'contact', 'contacts'),
+  ];
+  if (changed(before.settings, after.settings)) {
+    writes.push(writeEvent('settings', 'current', {
+      kind: 'settings.update',
+      entityId: 'current',
+      settings: clone(after.settings),
+    }));
+  }
+  await Promise.all(writes);
+}
+
+export async function updateRegistry(mutator) {
+  const { state } = await readRegistry();
+  const before = clone(state);
+  const draft = clone(state);
+  const result = await mutator(draft);
+  draft.updatedAt = new Date().toISOString();
+  await persistDiff(before, draft);
+  return { state: draft, result };
 }
 
 export function publicState(state) {
-  const gifts = state.gifts.filter((gift) => gift.visible !== false && gift.status !== 'hidden').map((gift) => ({ ...gift }));
-  const activeGifts = gifts.filter((gift) => ['available'].includes(gift.status) || (gift.collected > 0 && gift.collected < gift.price));
+  const gifts = state.gifts
+    .filter((gift) => gift.visible !== false && gift.status !== 'hidden')
+    .map((gift) => ({ ...gift }));
+  const activeGifts = gifts.filter((gift) => gift.status === 'available' || (gift.collected > 0 && gift.collected < gift.price));
   const funded = gifts.filter((gift) => ['funded', 'reserved', 'purchased'].includes(gift.status) || gift.collected >= gift.price).length;
   const totalCollected = gifts.reduce((sum, gift) => sum + Number(gift.collected || 0), 0);
   return {
@@ -211,10 +300,12 @@ export function publicState(state) {
 
 export function recalculateGiftFromCommitments(state, giftId) {
   const gift = state.gifts.find((item) => item.id === giftId);
-  if (!gift) return;
-  const active = state.commitments.filter((item) => item.giftId === giftId && item.status !== 'cancelled');
-  const collected = active.reduce((sum, item) => sum + Number(item.amount || 0), 0);
-  gift.collected = Math.min(Math.max(0, collected), Number(gift.price || 0));
+  if (!gift || gift.status === 'hidden') return;
+  const active = state.commitments
+    .filter((item) => item.giftId === giftId && item.status !== 'cancelled')
+    .sort((left, right) => String(left.createdAt || '').localeCompare(String(right.createdAt || '')) || String(left.id).localeCompare(String(right.id)));
+  const promised = active.reduce((sum, item) => sum + Number(item.amount || 0), 0);
+  gift.collected = Math.min(Math.max(0, promised), Number(gift.price || 0));
   gift.participantCount = active.length;
   const purchased = active.some((item) => item.mode === 'full' && item.intent === 'purchased');
   const reserved = active.some((item) => item.mode === 'full' && item.intent !== 'purchased');
