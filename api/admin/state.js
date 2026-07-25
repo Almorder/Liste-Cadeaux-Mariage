@@ -9,7 +9,7 @@ export default async function handler(request, response) {
   if (!requireAdmin(request)) return json(response, 401, { error: 'Connexion requise.' });
   try {
     const { state } = await readRegistry();
-    return json(response, 200, { ...state, release: 'storage-v9-append-only' });
+    return json(response, 200, { ...state, release: 'storage-v10-whatsapp-groups' });
   } catch (error) {
     console.error('ADMIN_STATE_STORAGE_ERROR', error);
     const diagnostic = classifyStorageError(error);

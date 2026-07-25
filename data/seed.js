@@ -1138,7 +1138,8 @@ const seed = {
         "description": "Deux ensembles qui nous plaisent, avec un seul set à sélectionner.",
         "category": "Couteaux"
       }
-    }
+    },
+    "whatsappGroups": {}
   },
   "updatedAt": null
 };

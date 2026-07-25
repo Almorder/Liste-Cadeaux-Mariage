@@ -13,6 +13,8 @@ export default async function handler(request, response) {
     const identity = validateGuestIdentity(body);
     const giftId = cleanText(body.giftId, 100);
     const message = cleanMultiline(body.message, 700);
+    const whatsappConsent = Boolean(body.whatsappConsent);
+    if (!whatsappConsent) throw new Error('Merci d’accepter d’être contacté(e) sur WhatsApp pour poursuivre.');
 
     await updateRegistry((draft) => {
       const gift = draft.gifts.find((item) => item.id === giftId);
@@ -22,6 +24,7 @@ export default async function handler(request, response) {
         giftId,
         ...identity,
         message,
+        whatsappConsent,
         status: 'pending',
         createdAt: new Date().toISOString(),
       });
@@ -31,7 +34,7 @@ export default async function handler(request, response) {
   } catch (error) {
     console.error(error);
     const message = error instanceof Error ? error.message : 'Envoi impossible.';
-    const status = /introuvable|renseigner|refusé|instant/i.test(message) ? 400 : 500;
+    const status = /introuvable|renseigner|refusé|instant|accepter/i.test(message) ? 400 : 500;
     return json(response, status, { error: status === 500 ? safeError(error) : message });
   }
 

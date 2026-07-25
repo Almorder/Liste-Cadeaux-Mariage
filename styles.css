@@ -566,3 +566,17 @@ em { font-weight: 400; }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { scroll-behavior: auto !important; animation-duration: .001ms !important; transition-duration: .001ms !important; }
 }
+
+.coordination-consent {
+  margin: 2px 0 0;
+  padding: 13px 14px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--beige-50);
+  text-transform: none;
+  letter-spacing: 0;
+  color: var(--ink-soft);
+  font-weight: 600;
+}
+.coordination-consent span { line-height: 1.45; }
+.coordination-consent { display: flex; max-width: none; align-items: flex-start; }

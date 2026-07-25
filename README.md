@@ -1,122 +1,65 @@
-# Liste de mariage — Myriam & Nolan
+# Liste de mariage Myriam & Nolan
 
-Site public et espace administrateur privé, préparés pour un déploiement Vercel.
+Version : `storage-v10-whatsapp-groups`
 
-## Ce que contient cette version
+Site public et espace administrateur privé pour Vercel, avec un stockage Vercel Blob en événements immuables. Chaque participation est enregistrée dans un fichier indépendant afin d’éviter les conflits ETag.
 
-- 46 produits importés depuis le fichier Excel ;
-- exclusions automatiques des mémos `A TESTER` et `WISHLIST ONLY` ;
-- catégories, recherche et filtres ;
-- variantes de budget regroupées ;
-- réservations complètes et participations collectives ;
-- progression en euros et en pourcentage ;
-- demandes de mise en relation ;
-- administration privée des produits, images, statuts et participations ;
-- stockage partagé entre tous les invités ;
-- aucune donnée personnelle exposée par l’API publique.
+## Fonctionnalités
 
-## Architecture
+- 46 cadeaux importés depuis le fichier Excel ;
+- variantes exclusives regroupées ;
+- achat complet et participation collective ;
+- suivi des montants promis, reçus et annulés ;
+- espace administrateur protégé ;
+- ajout et modification des cadeaux ;
+- mise en relation regroupée par produit ;
+- messages WhatsApp individuels préremplis ;
+- export `.vcf` des participants pour les importer dans le téléphone ;
+- enregistrement privé du lien d’invitation du groupe WhatsApp ;
+- exactement 12 Vercel Functions, compatible avec la limite du plan Hobby.
 
-Le projet utilise :
+## Déploiement
 
-- des pages HTML/CSS/JavaScript statiques pour l’interface ;
-- des Vercel Functions dans `/api` ;
-- un **Vercel Blob Store privé** pour la liste, les coordonnées et les images ;
-- une session administrateur signée dans un cookie `HttpOnly`.
+1. Importer le contenu de ce dossier dans le dépôt GitHub relié à Vercel.
+2. Vérifier que le Blob Store privé est toujours connecté au projet.
+3. Conserver les variables existantes :
+   - `ADMIN_EMAIL`
+   - `ADMIN_PASSWORD`
+   - `SESSION_SECRET`
+   - les variables Blob ajoutées automatiquement par Vercel
+4. Lancer ou attendre le nouveau déploiement Production.
 
-L’adresse e-mail et le mot de passe administrateur sont uniquement enregistrés dans les variables d’environnement Vercel. Ils ne doivent jamais être ajoutés au dépôt GitHub.
+Aucune nouvelle variable d’environnement n’est nécessaire pour la coordination WhatsApp.
 
+## Vérification de la version
 
-## Compatibilité avec Vercel Hobby
+Ouvrir :
 
-Cette version contient exactement 12 fonctions Serverless, soit la limite du plan Hobby.
-Le précédent endpoint de diagnostic `/api/health` a été retiré pour respecter cette limite.
-La liste publique peut être testée avec `/api/public`.
-
-## Déploiement Vercel
-
-### 1. Importer le dépôt
-
-Dans Vercel :
-
-1. cliquez sur **Add New → Project** ;
-2. sélectionnez le dépôt GitHub `Almorder/Liste-Cadeaux-Mariage` ;
-3. conservez le framework **Other** et les réglages de build automatiques ;
-4. lancez un premier déploiement.
-
-### 2. Créer le stockage privé
-
-Dans le projet Vercel :
-
-1. ouvrez **Storage** ;
-2. choisissez **Create Database → Blob** ;
-3. sélectionnez impérativement **Private** ;
-4. connectez le store au projet.
-
-Vercel ajoutera automatiquement `BLOB_READ_WRITE_TOKEN` au projet.
-
-### 3. Ajouter les secrets administrateur
-
-Dans **Settings → Environment Variables**, ajoutez :
-
-- `ADMIN_EMAIL` : votre adresse e-mail exacte ;
-- `ADMIN_PASSWORD` : un mot de passe unique et long ;
-- `SESSION_SECRET` : une chaîne aléatoire d’au moins 32 caractères.
-
-Exemple de génération de secret :
-
-```bash
-openssl rand -base64 48
+```text
+https://votre-projet.vercel.app/api/public
 ```
 
-Ajoutez ces variables aux environnements **Production**, **Preview** et **Development**, puis redéployez le projet.
-
-### 4. Ouvrir le site
-
-- Liste publique : `https://votre-projet.vercel.app/`
-- Administration : `https://votre-projet.vercel.app/admin`
-
-Au premier chargement, le stockage est initialisé automatiquement avec les 46 produits.
-
-## Sécurité
-
-- les invités ne peuvent lire que les produits et les montants publics ;
-- les noms, téléphones, messages et demandes ne sont retournés que par les routes `/api/admin/*` après authentification ;
-- le cookie administrateur est `HttpOnly`, `Secure` et `SameSite=Strict` ;
-- les images importées sont stockées dans le Blob Store privé et diffusées via une route limitée aux images produit ;
-- aucune clé ou aucun mot de passe ne doit être commité dans GitHub.
-
-## Utilisation locale
-
-La page publique peut être ouverte avec un serveur statique local. Elle utilisera alors un mode de prévisualisation sans enregistrement. Les fonctions complètes nécessitent Vercel et un Blob Store connecté.
-
-## Mise à jour des fichiers dans GitHub
-
-Depuis un terminal placé dans le dossier du projet :
-
-```bash
-git add .
-git commit -m "Déploie la liste de mariage sécurisée sur Vercel"
-git push origin main
-```
-
-## Diagnostic rapide après déploiement
-
-Ouvrez `https://votre-projet.vercel.app/api/health`.
-
-Le résultat doit contenir :
+La réponse doit contenir :
 
 ```json
-{
-  "ok": true,
-  "storage": { "ok": true, "code": "OK", "giftCount": 46 },
-  "environment": {
-    "blobTokenPresent": true,
-    "adminEmailPresent": true,
-    "adminPasswordPresent": true,
-    "sessionSecretValid": true
-  }
-}
+"release": "storage-v10-whatsapp-groups"
 ```
 
-Si `storage.ok` est faux, vérifiez que le Blob Store est **Private**, connecté à ce projet et activé pour **Production**, puis redéployez sans cache.
+## Administration
+
+Ouvrir :
+
+```text
+https://votre-projet.vercel.app/admin
+```
+
+La section **Mises en relation** affiche une fiche par cadeau avec tous les participants et toutes les demandes associées.
+
+Le fonctionnement détaillé se trouve dans `README-WHATSAPP.md`.
+
+## Confidentialité
+
+- les noms, téléphones et messages ne sont accessibles qu’après connexion à l’administration ;
+- les liens privés des groupes WhatsApp sont retirés de `/api/public` ;
+- les nouveaux formulaires demandent explicitement l’accord de la personne avant tout contact WhatsApp ;
+- aucun secret ne doit être ajouté au dépôt GitHub.

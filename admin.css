@@ -147,3 +147,107 @@
   .admin-modal-actions { flex-direction: column-reverse; }
   .admin-modal-actions .button { width: 100%; }
 }
+
+/* Coordination WhatsApp */
+.coordination-intro {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+}
+.coordination-intro h2 { margin-bottom: 6px; }
+.coordination-intro p { max-width: 720px; margin: 0; }
+.coordination-intro-stats {
+  flex: 0 0 auto;
+  display: grid;
+  grid-template-columns: auto auto;
+  align-items: baseline;
+  gap: 2px 10px;
+  min-width: 220px;
+}
+.coordination-intro-stats strong { font-family: var(--serif); font-size: 32px; font-weight: 500; }
+.coordination-intro-stats span { color: var(--muted); font-size: 12px; }
+.coordination-grid { display: grid; gap: 18px; }
+.coordination-card {
+  border: 1px solid var(--line);
+  border-radius: 22px;
+  overflow: hidden;
+  background: var(--paper);
+  box-shadow: var(--shadow-sm);
+}
+.coordination-card-head {
+  padding: 18px;
+  display: grid;
+  grid-template-columns: 92px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 16px;
+  border-bottom: 1px solid var(--line);
+  background: linear-gradient(135deg, #fffdfb, #fbf4f2);
+}
+.coordination-card-head img { width: 92px; aspect-ratio: 4 / 3; border-radius: 14px; object-fit: cover; background: var(--rose-100); }
+.coordination-card-head h2 { margin: 4px 0 4px; font-size: clamp(28px, 3vw, 40px); }
+.coordination-card-head p:last-child { margin: 0; color: var(--muted); font-size: 13px; }
+.coordination-people { display: grid; }
+.coordination-person {
+  padding: 14px 18px;
+  display: grid;
+  grid-template-columns: minmax(210px, 1.25fr) minmax(170px, .75fr) auto;
+  align-items: center;
+  gap: 14px;
+  border-bottom: 1px solid var(--line);
+}
+.coordination-person-main, .coordination-person-meta { display: grid; gap: 3px; }
+.coordination-person-main span, .coordination-person-main small { color: var(--muted); }
+.coordination-person-main small { max-width: 680px; }
+.coordination-person-meta { justify-items: start; }
+.coordination-person-actions { display: flex; gap: 7px; justify-content: flex-end; }
+.consent-badge { padding: 4px 7px; border-radius: 999px; font-size: 10px; font-weight: 800; }
+.consent-badge.ok { background: #e8f2e6; color: #476247; }
+.consent-badge.legacy { background: #f4ecdc; color: #79603a; }
+.consent-badge.missing { background: #f4e6e9; color: #874a57; }
+.coordination-actions { padding: 14px 18px; display: flex; flex-wrap: wrap; gap: 8px; border-bottom: 1px solid var(--line); background: #fffdfb; }
+.whatsapp-group-box { padding: 18px; background: var(--beige-50); }
+.whatsapp-group-fields { display: grid; grid-template-columns: 190px minmax(280px, 1fr) auto; align-items: end; gap: 12px; }
+.whatsapp-group-fields .field { margin: 0; }
+.whatsapp-group-fields .button { min-height: 48px; }
+.whatsapp-group-foot { margin-top: 10px; display: flex; justify-content: space-between; gap: 12px; color: var(--muted); font-size: 12px; }
+.whatsapp-group-foot a { color: var(--ink); font-weight: 800; }
+.coordination-modal { width: min(860px, 100%); }
+.coordination-modal h2 { margin-bottom: 14px; }
+.coordination-guide { margin-bottom: 16px; padding: 15px; border-radius: 15px; background: var(--beige-50); }
+.coordination-guide p { margin: 5px 0 0; color: var(--muted); }
+.coordination-invite-list { border: 1px solid var(--line); border-radius: 16px; overflow: hidden; }
+.coordination-invite-row { padding: 13px 14px; display: flex; align-items: center; justify-content: space-between; gap: 14px; border-bottom: 1px solid var(--line); }
+.coordination-invite-row:last-child { border-bottom: 0; }
+.coordination-invite-row div { display: grid; gap: 2px; }
+.coordination-invite-row small { color: var(--muted); }
+.coordination-modal-actions { align-items: center; }
+.button.disabled { pointer-events: none; opacity: .45; }
+
+@media (max-width: 900px) {
+  .coordination-intro { align-items: flex-start; flex-direction: column; }
+  .coordination-card-head { grid-template-columns: 74px minmax(0, 1fr); }
+  .coordination-card-head img { width: 74px; }
+  .coordination-card-head .status-pill { grid-column: 1 / -1; justify-self: start; }
+  .coordination-person { grid-template-columns: 1fr auto; }
+  .coordination-person-meta { justify-self: end; }
+  .coordination-person-actions { grid-column: 1 / -1; justify-content: stretch; }
+  .coordination-person-actions .button { flex: 1; }
+  .whatsapp-group-fields { grid-template-columns: 1fr; }
+  .whatsapp-group-foot { flex-direction: column; }
+}
+
+@media (max-width: 560px) {
+  .coordination-intro-stats { min-width: 0; }
+  .coordination-card-head { padding: 14px; gap: 11px; }
+  .coordination-card-head h2 { font-size: 29px; }
+  .coordination-person { padding: 14px; grid-template-columns: 1fr; }
+  .coordination-person-meta { justify-self: start; }
+  .coordination-person-actions { grid-column: auto; }
+  .coordination-actions { padding: 14px; }
+  .coordination-actions .button { width: 100%; }
+  .whatsapp-group-box { padding: 14px; }
+  .coordination-invite-row { align-items: stretch; flex-direction: column; }
+  .coordination-invite-row .button { width: 100%; }
+}
+.coordination-person-main small { overflow-wrap: anywhere; }

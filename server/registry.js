@@ -279,6 +279,7 @@ export async function updateRegistry(mutator) {
 }
 
 export function publicState(state) {
+  const { whatsappGroups: _privateWhatsappGroups, ...publicSettings } = state.settings || {};
   const gifts = state.gifts
     .filter((gift) => gift.visible !== false && gift.status !== 'hidden')
     .map((gift) => ({ ...gift }));
@@ -287,7 +288,7 @@ export function publicState(state) {
   const totalCollected = gifts.reduce((sum, gift) => sum + Number(gift.collected || 0), 0);
   return {
     gifts,
-    settings: state.settings,
+    settings: publicSettings,
     stats: {
       total: gifts.length,
       available: activeGifts.length,

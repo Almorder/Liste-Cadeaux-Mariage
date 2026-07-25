@@ -8,14 +8,14 @@ export default async function handler(request, response) {
   if (request.method !== 'GET') return methodNotAllowed(response, ['GET']);
   try {
     const { state } = await readRegistry();
-    return json(response, 200, { ...publicState(state), degradedMode: false, release: 'storage-v9-append-only' });
+    return json(response, 200, { ...publicState(state), degradedMode: false, release: 'storage-v10-whatsapp-groups' });
   } catch (error) {
     console.error('PUBLIC_REGISTRY_ERROR', error);
     const diagnostic = classifyStorageError(error);
     return json(response, 200, {
       ...publicState(structuredClone(seed)),
       degradedMode: true,
-      release: 'storage-v9-append-only',
+      release: 'storage-v10-whatsapp-groups',
       storageCode: diagnostic.code,
       warning: diagnostic.message,
       blobDiagnostics: blobAuthDiagnostics(request),
