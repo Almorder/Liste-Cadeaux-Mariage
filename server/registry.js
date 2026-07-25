@@ -11,14 +11,37 @@ function cloneSeed() {
 }
 
 function blobOptions(extra = {}) {
-  // Les nouveaux projets Vercel Blob utilisent OIDC par défaut.
-  // On ne transmet un token statique que lorsqu'il existe réellement ;
-  // sinon le SDK récupère automatiquement le jeton OIDC de la Function.
-  const options = { access: ACCESS, ...extra };
-  if (process.env.BLOB_READ_WRITE_TOKEN) {
-    options.token = process.env.BLOB_READ_WRITE_TOKEN;
+  // Ne pas forcer de credential ici : le SDK choisit automatiquement
+  // l'OIDC Vercel moderne ou BLOB_READ_WRITE_TOKEN pour les anciens stores.
+  return { access: ACCESS, ...extra };
+}
+
+export function classifyStorageError(error) {
+  const name = String(error?.name || error?.code || '');
+  const message = String(error?.message || '').toLowerCase();
+  const status = Number(error?.statusCode || error?.status || error?.response?.status || 0);
+  if (status === 401 || status === 403 || /unauthor|forbidden|credential|token|oidc|access/.test(message)) {
+    return {
+      code: 'BLOB_AUTH',
+      message: 'Le Blob Store n’autorise pas encore ce déploiement. Connecte le projet au store ou active OIDC, puis redéploie.',
+    };
   }
-  return options;
+  if (/private|public|access mode|access.*mismatch/.test(message)) {
+    return {
+      code: 'BLOB_ACCESS_MODE',
+      message: 'Le mode du Blob Store ne correspond pas au site. Le store doit être créé en mode Private.',
+    };
+  }
+  if (status === 404 || /store.*not found|does not exist|unknown store/.test(message)) {
+    return {
+      code: 'BLOB_NOT_CONNECTED',
+      message: 'Aucun Blob Store utilisable n’est connecté à ce projet Vercel en Production.',
+    };
+  }
+  return {
+    code: name || 'BLOB_UNKNOWN',
+    message: 'Le stockage Vercel Blob est inaccessible. Consulte les logs de la Function concernée dans Vercel.',
+  };
 }
 
 function isMissingBlobError(error) {

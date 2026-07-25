@@ -1,6 +1,6 @@
 import crypto from 'node:crypto';
 import { json, methodNotAllowed, parseJsonBody, safeError } from '../server/http.js';
-import { activeVariant, publicState, recalculateGiftFromCommitments, updateRegistry } from '../server/registry.js';
+import { activeVariant, classifyStorageError, publicState, recalculateGiftFromCommitments, updateRegistry } from '../server/registry.js';
 import { cleanMultiline, cleanText, finiteMoney, validateGuestIdentity, validateHoneypot } from '../server/validation.js';
 
 export default async function handler(request, response) {
@@ -56,6 +56,10 @@ export default async function handler(request, response) {
     console.error(error);
     const message = error instanceof Error ? error.message : 'Envoi impossible.';
     const status = /introuvable|déjà|variante|montant|renseigner|participations|refusé|instant/i.test(message) ? 400 : 500;
-    return json(response, status, { error: status === 500 ? safeError(error) : message });
+    if (status === 500) {
+      const diagnostic = classifyStorageError(error);
+      return json(response, 500, { error: diagnostic.message, code: diagnostic.code });
+    }
+    return json(response, status, { error: message });
   }
 }
