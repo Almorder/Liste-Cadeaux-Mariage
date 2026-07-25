@@ -583,11 +583,17 @@ async function loadData({ quiet = false } = {}) {
     const result = await response.json();
     if (!response.ok) throw new Error(result.error || 'Connexion impossible.');
     state.data = result;
-    state.demo = false;
-    dom.syncState.textContent = 'Liste synchronisée';
-    dom.syncState.classList.remove('demo');
+    state.demo = Boolean(result.degradedMode);
+    dom.syncState.textContent = result.degradedMode ? 'Lecture seule temporaire' : 'Liste synchronisée';
+    dom.syncState.classList.toggle('demo', Boolean(result.degradedMode));
     renderFilterOptions();
     renderAll();
+    if (result.degradedMode) {
+      const banner = document.createElement('div');
+      banner.className = 'error-banner';
+      banner.innerHTML = `<strong>Liste visible en lecture seule.</strong><br>${escapeHtml(result.warning || 'Les réservations sont momentanément indisponibles.')}`;
+      dom.catalogContent.prepend(banner);
+    }
   } catch (error) {
     const local = ['localhost', '127.0.0.1', ''].includes(location.hostname) || location.protocol === 'file:';
     if (local) {

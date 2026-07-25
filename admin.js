@@ -516,7 +516,7 @@ async function loadAdmin() {
     renderApp('products');
   } catch (error) {
     if (error.status === 401) renderLogin();
-    else renderLogin(error.message);
+    else renderLogin(`${error.message} Diagnostic : ouvre /api/health dans un nouvel onglet.`);
   }
 }
 

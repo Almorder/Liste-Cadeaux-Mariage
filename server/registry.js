@@ -10,46 +10,81 @@ function cloneSeed() {
   return value;
 }
 
-async function readRegistryBlob() {
-  const result = await get(REGISTRY_PATH, { access: ACCESS });
-  if (!result || result.statusCode !== 200 || !result.stream) return null;
-  const text = await new Response(result.stream).text();
+function blobOptions(extra = {}) {
   return {
-    state: JSON.parse(text),
-    etag: result.blob.etag,
+    access: ACCESS,
+    token: process.env.BLOB_READ_WRITE_TOKEN,
+    ...extra,
   };
+}
+
+function isMissingBlobError(error) {
+  const status = Number(error?.statusCode || error?.status || error?.response?.status || 0);
+  const code = String(error?.code || error?.name || '').toLowerCase();
+  const message = String(error?.message || '').toLowerCase();
+  return status === 404 || code.includes('notfound') || code.includes('not_found') || message.includes('not found') || message.includes('does not exist');
+}
+
+export function blobConfigurationStatus() {
+  return {
+    hasToken: Boolean(process.env.BLOB_READ_WRITE_TOKEN),
+    access: ACCESS,
+    registryPath: REGISTRY_PATH,
+  };
+}
+
+async function readRegistryBlob() {
+  try {
+    const result = await get(REGISTRY_PATH, blobOptions());
+    if (!result || result.statusCode === 404) return null;
+    if (result.statusCode !== 200 || !result.stream) {
+      throw new Error(`Lecture Blob inattendue (statut ${result.statusCode || 'inconnu'}).`);
+    }
+    const text = await new Response(result.stream).text();
+    return {
+      state: JSON.parse(text),
+      etag: result.blob?.etag || null,
+    };
+  } catch (error) {
+    if (isMissingBlobError(error)) return null;
+    throw error;
+  }
 }
 
 async function initializeRegistry() {
   const state = cloneSeed();
   try {
-    await put(REGISTRY_PATH, JSON.stringify(state), {
-      access: ACCESS,
+    const blob = await put(REGISTRY_PATH, JSON.stringify(state), blobOptions({
       contentType: 'application/json; charset=utf-8',
       cacheControlMaxAge: 60,
-    });
-    return { state, etag: null };
-  } catch {
+      addRandomSuffix: false,
+      allowOverwrite: false,
+    }));
+    return { state, etag: blob?.etag || null };
+  } catch (error) {
+    // Une autre fonction a pu initialiser le fichier entre-temps.
     const existing = await readRegistryBlob();
     if (existing) return existing;
-    throw new Error('Impossible d’initialiser le stockage Vercel Blob. Vérifiez BLOB_READ_WRITE_TOKEN et le mode privé du store.');
+    throw error;
   }
 }
 
 export async function readRegistry() {
-  if (!process.env.BLOB_READ_WRITE_TOKEN) throw new Error('BLOB_READ_WRITE_TOKEN est absent. Connectez un Blob Store privé au projet Vercel.');
+  if (!process.env.BLOB_READ_WRITE_TOKEN) {
+    throw new Error('BLOB_READ_WRITE_TOKEN est absent. Connectez un Vercel Blob Store privé au projet et redéployez.');
+  }
   return (await readRegistryBlob()) || initializeRegistry();
 }
 
 async function writeRegistry(state, etag) {
   state.updatedAt = new Date().toISOString();
-  return put(REGISTRY_PATH, JSON.stringify(state), {
-    access: ACCESS,
+  return put(REGISTRY_PATH, JSON.stringify(state), blobOptions({
     contentType: 'application/json; charset=utf-8',
     cacheControlMaxAge: 60,
+    addRandomSuffix: false,
     allowOverwrite: true,
     ...(etag ? { ifMatch: etag } : {}),
-  });
+  }));
 }
 
 export async function updateRegistry(mutator, attempts = 5) {

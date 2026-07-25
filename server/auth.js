@@ -24,7 +24,23 @@ function sign(value) {
   return crypto.createHmac('sha256', secret).update(value).digest('base64url');
 }
 
+export function adminConfigurationStatus() {
+  return {
+    hasEmail: Boolean(String(process.env.ADMIN_EMAIL || '').trim()),
+    hasPassword: Boolean(String(process.env.ADMIN_PASSWORD || '')),
+    sessionSecretValid: String(process.env.SESSION_SECRET || '').length >= 32,
+  };
+}
+
+export function assertAdminConfiguration() {
+  const status = adminConfigurationStatus();
+  if (!status.hasEmail) throw new Error('ADMIN_EMAIL est absent dans les variables Vercel de Production.');
+  if (!status.hasPassword) throw new Error('ADMIN_PASSWORD est absent dans les variables Vercel de Production.');
+  if (!status.sessionSecretValid) throw new Error('SESSION_SECRET doit contenir au moins 32 caractères dans Vercel.');
+}
+
 export function createSessionToken(email) {
+  assertAdminConfiguration();
   const payload = {
     email,
     exp: Math.floor(Date.now() / 1000) + SESSION_DURATION_SECONDS,
@@ -41,7 +57,7 @@ export function verifySessionToken(token) {
   try {
     const payload = JSON.parse(Buffer.from(encoded, 'base64url').toString('utf8'));
     if (!payload.email || !payload.exp || payload.exp < Math.floor(Date.now() / 1000)) return null;
-    if (!constantTimeEqual(payload.email.toLowerCase(), String(process.env.ADMIN_EMAIL || '').toLowerCase())) return null;
+    if (!constantTimeEqual(payload.email.toLowerCase(), String(process.env.ADMIN_EMAIL || '').trim().toLowerCase())) return null;
     return payload;
   } catch {
     return null;
@@ -64,17 +80,17 @@ export function requireAdmin(request) {
 }
 
 export function credentialsAreValid(email, password) {
+  assertAdminConfiguration();
   const expectedEmail = String(process.env.ADMIN_EMAIL || '').trim().toLowerCase();
   const expectedPassword = String(process.env.ADMIN_PASSWORD || '');
-  if (!expectedEmail || !expectedPassword) throw new Error('ADMIN_EMAIL et ADMIN_PASSWORD doivent être configurés dans Vercel.');
   return constantTimeEqual(String(email || '').trim().toLowerCase(), expectedEmail)
     && constantTimeEqual(String(password || ''), expectedPassword);
 }
 
 export function setSessionCookie(response, token) {
-  response.setHeader('Set-Cookie', `${COOKIE_NAME}=${encodeURIComponent(token)}; Path=/; HttpOnly; Secure; SameSite=Strict; Max-Age=${SESSION_DURATION_SECONDS}`);
+  response.setHeader('Set-Cookie', `${COOKIE_NAME}=${encodeURIComponent(token)}; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=${SESSION_DURATION_SECONDS}`);
 }
 
 export function clearSessionCookie(response) {
-  response.setHeader('Set-Cookie', `${COOKIE_NAME}=; Path=/; HttpOnly; Secure; SameSite=Strict; Max-Age=0`);
+  response.setHeader('Set-Cookie', `${COOKIE_NAME}=; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=0`);
 }

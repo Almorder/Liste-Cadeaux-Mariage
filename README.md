@@ -92,3 +92,24 @@ git add .
 git commit -m "Déploie la liste de mariage sécurisée sur Vercel"
 git push origin main
 ```
+
+## Diagnostic rapide après déploiement
+
+Ouvrez `https://votre-projet.vercel.app/api/health`.
+
+Le résultat doit contenir :
+
+```json
+{
+  "ok": true,
+  "storage": { "ok": true, "code": "OK", "giftCount": 46 },
+  "environment": {
+    "blobTokenPresent": true,
+    "adminEmailPresent": true,
+    "adminPasswordPresent": true,
+    "sessionSecretValid": true
+  }
+}
+```
+
+Si `storage.ok` est faux, vérifiez que le Blob Store est **Private**, connecté à ce projet et activé pour **Production**, puis redéployez sans cache.
