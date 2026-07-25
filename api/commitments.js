@@ -12,11 +12,25 @@ export default async function handler(request, response) {
     validateHoneypot(body);
     const identity = validateGuestIdentity(body);
     const giftId = cleanText(body.giftId, 100);
+    const requestId = cleanText(body.requestId, 120);
     const mode = body.mode === 'full' ? 'full' : 'collective';
     const intent = body.intent === 'purchased' ? 'purchased' : 'reserved';
     const message = cleanMultiline(body.message, 700);
 
     const { state, result } = await updateRegistry((draft) => {
+      if (requestId) {
+        const existing = draft.commitments.find((item) => item.requestId === requestId);
+        if (existing) {
+          const existingGift = draft.gifts.find((item) => item.id === existing.giftId);
+          return {
+            commitmentId: existing.id,
+            amount: existing.amount,
+            giftName: existingGift?.name || 'Cadeau',
+            duplicate: true,
+          };
+        }
+      }
+
       const gift = draft.gifts.find((item) => item.id === giftId && item.visible !== false);
       if (!gift) throw new Error('Ce cadeau est introuvable.');
       const groupSelection = activeVariant(draft, gift.variantGroup);
@@ -35,6 +49,7 @@ export default async function handler(request, response) {
       if (amount > remaining) amount = remaining;
       const commitment = {
         id: crypto.randomUUID(),
+        requestId: requestId || null,
         giftId: gift.id,
         ...identity,
         amount,
@@ -57,7 +72,11 @@ export default async function handler(request, response) {
   } catch (error) {
     console.error(error);
     const message = error instanceof Error ? error.message : 'Envoi impossible.';
-    const status = /introuvable|déjà|variante|montant|renseigner|participations|refusé|instant/i.test(message) ? 400 : 500;
+    const conflict = error?.code === 'REGISTRY_WRITE_CONFLICT';
+    const status = conflict ? 409 : (/introuvable|déjà|variante|montant|renseigner|participations|refusé|instant/i.test(message) ? 400 : 500);
+    if (status === 409) {
+      return json(response, 409, { error: message, code: 'REGISTRY_WRITE_CONFLICT' });
+    }
     if (status === 500) {
       const diagnostic = classifyStorageError(error);
       return json(response, 500, { error: diagnostic.message, code: diagnostic.code });

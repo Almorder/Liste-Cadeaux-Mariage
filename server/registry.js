@@ -45,6 +45,25 @@ export function classifyStorageError(error) {
   };
 }
 
+function isPreconditionFailedError(error) {
+  const status = Number(error?.statusCode || error?.status || error?.response?.status || 0);
+  const code = String(error?.code || error?.name || '').toLowerCase();
+  const message = String(error?.message || '').toLowerCase();
+  return (
+    error instanceof BlobPreconditionFailedError ||
+    status === 412 ||
+    code.includes('precondition') ||
+    code.includes('etag') ||
+    message.includes('precondition failed') ||
+    message.includes('etag mismatch') ||
+    message.includes('etag does not match')
+  );
+}
+
+function sleep(milliseconds) {
+  return new Promise((resolve) => setTimeout(resolve, milliseconds));
+}
+
 function isMissingBlobError(error) {
   const status = Number(error?.statusCode || error?.status || error?.response?.status || 0);
   const code = String(error?.code || error?.name || '').toLowerCase();
@@ -114,7 +133,7 @@ async function writeRegistry(state, etag) {
   }));
 }
 
-export async function updateRegistry(mutator, attempts = 5) {
+export async function updateRegistry(mutator, attempts = 8) {
   let lastError;
   for (let attempt = 0; attempt < attempts; attempt += 1) {
     const { state, etag } = await readRegistry();
@@ -124,14 +143,25 @@ export async function updateRegistry(mutator, attempts = 5) {
       await writeRegistry(draft, etag);
       return { state: draft, result };
     } catch (error) {
-      if (error instanceof BlobPreconditionFailedError) {
-        lastError = error;
-        continue;
-      }
-      throw error;
+      if (!isPreconditionFailedError(error)) throw error;
+
+      lastError = error;
+      // Une autre Function a écrit entre notre lecture et notre écriture.
+      // On relit l'état le plus récent puis on rejoue la mutation.
+      const backoff = Math.min(800, 50 * (2 ** attempt)) + Math.floor(Math.random() * 75);
+      console.warn('REGISTRY_ETAG_CONFLICT_RETRY', {
+        attempt: attempt + 1,
+        attempts,
+        backoff,
+      });
+      await sleep(backoff);
     }
   }
-  throw lastError || new Error('La liste a été modifiée simultanément. Merci de réessayer.');
+
+  const conflict = new Error('La liste vient d’être modifiée par une autre personne. Merci de réessayer dans un instant.');
+  conflict.code = 'REGISTRY_WRITE_CONFLICT';
+  conflict.cause = lastError;
+  throw conflict;
 }
 
 export function publicState(state) {

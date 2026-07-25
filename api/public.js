@@ -8,14 +8,14 @@ export default async function handler(request, response) {
   if (request.method !== 'GET') return methodNotAllowed(response, ['GET']);
   try {
     const { state } = await readRegistry();
-    return json(response, 200, { ...publicState(state), degradedMode: false, release: 'storage-v6-oidc-auto' });
+    return json(response, 200, { ...publicState(state), degradedMode: false, release: 'storage-v7-etag-retry' });
   } catch (error) {
     console.error('PUBLIC_REGISTRY_ERROR', error);
     const diagnostic = classifyStorageError(error);
     return json(response, 200, {
       ...publicState(structuredClone(seed)),
       degradedMode: true,
-      release: 'storage-v6-oidc-auto',
+      release: 'storage-v7-etag-retry',
       storageCode: diagnostic.code,
       warning: diagnostic.message,
       blobDiagnostics: blobAuthDiagnostics(request),
