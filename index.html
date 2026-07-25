@@ -1,0 +1,136 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#f7efed">
+  <meta name="description" content="La liste de mariage de Myriam et Nolan, pensée avec amour et sans aucune obligation.">
+  <meta name="robots" content="noindex, nofollow, noarchive">
+  <title>Liste de mariage · Myriam & Nolan</title>
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body class="is-loading">
+  <div class="ambient ambient-one" aria-hidden="true"></div>
+  <div class="ambient ambient-two" aria-hidden="true"></div>
+  <div class="grain" aria-hidden="true"></div>
+
+  <section class="intro-gate" id="introGate" aria-labelledby="introTitle">
+    <div class="intro-panel">
+      <div class="monogram" aria-hidden="true">M × N</div>
+      <p class="eyebrow">Avant de découvrir notre liste</p>
+      <h1 id="introTitle">Quelques mots,<br><em>tout simplement.</em></h1>
+      <div class="intro-copy" id="introCopy"></div>
+      <div class="intro-reassurance">
+        <span>♡ Aucune obligation</span>
+        <span>♡ Tous les budgets comptent</span>
+        <span>♡ Votre présence avant tout</span>
+      </div>
+      <label class="consent-line">
+        <input type="checkbox" id="introConsent">
+        <span>J’ai lu ce message et je comprends que cette liste reste entièrement libre.</span>
+      </label>
+      <button class="button button-dark button-large" id="enterList" disabled>Découvrir notre liste</button>
+    </div>
+  </section>
+
+  <header class="site-header">
+    <a class="brand" href="#top" aria-label="Retour en haut">
+      <span class="brand-mark">M × N</span>
+      <span class="brand-text"><strong>Myriam & Nolan</strong><small id="headerDate">29 août 2026</small></span>
+    </a>
+    <div class="header-actions">
+      <button class="icon-button" id="refreshButton" aria-label="Actualiser la liste" title="Actualiser">↻</button>
+      <a class="icon-button admin-link" href="/admin" aria-label="Accès administrateur" title="Administration">⌘</a>
+    </div>
+  </header>
+
+  <main id="top">
+    <section class="hero shell">
+      <div class="hero-copy-block">
+        <p class="eyebrow">Notre liste de mariage</p>
+        <h1>Des envies pour<br><em>notre vie à deux.</em></h1>
+        <p class="hero-copy">Une sélection personnelle, pensée pour durer. Choisissez librement un cadeau, une variante ou le montant qui vous ressemble.</p>
+      </div>
+      <aside class="hero-card">
+        <div>
+          <p class="eyebrow light">Le plus important</p>
+          <h2>Votre présence est déjà un cadeau.</h2>
+        </div>
+        <p>Cette liste est là pour vous guider, jamais pour créer une attente. Une enveloppe, une autre idée ou simplement votre présence nous feront tout autant plaisir.</p>
+        <div class="hero-stats" id="heroStats">
+          <div><strong>–</strong><span>envies</span></div>
+          <div><strong>–</strong><span>disponibles</span></div>
+          <div><strong>–</strong><span>déjà choisies</span></div>
+        </div>
+      </aside>
+    </section>
+
+    <section class="filter-zone" aria-label="Filtres">
+      <div class="filter-bar shell">
+        <label class="search-field">
+          <span class="visually-hidden">Rechercher un cadeau</span>
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m21 21-4.4-4.4m2.4-5.1a7.5 7.5 0 1 1-15 0 7.5 7.5 0 0 1 15 0Z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+          <input id="searchInput" type="search" placeholder="Rechercher un produit ou une marque">
+        </label>
+        <button class="button button-light" id="availableToggle">Disponibles uniquement</button>
+        <button class="button button-light" id="filtersToggle">Filtres <span id="filterCount"></span></button>
+      </div>
+      <div class="filter-drawer shell hidden" id="filterDrawer">
+        <div class="filter-group filter-group-wide">
+          <span class="filter-label">Catégorie</span>
+          <div class="chips" id="categoryFilters"></div>
+        </div>
+        <div class="filter-group">
+          <span class="filter-label">Pour qui ?</span>
+          <div class="chips" id="beneficiaryFilters"></div>
+        </div>
+        <div class="filter-group">
+          <span class="filter-label">Importance</span>
+          <div class="chips" id="priorityFilters"></div>
+        </div>
+        <div class="filter-group">
+          <span class="filter-label">Budget maximum</span>
+          <div class="range-head"><span>0 €</span><strong id="budgetValue">500 € et +</strong></div>
+          <input type="range" id="budgetRange" min="25" max="500" step="25" value="500">
+        </div>
+        <div class="filter-group filter-actions">
+          <button class="text-button" id="resetFilters">Réinitialiser les filtres</button>
+        </div>
+      </div>
+    </section>
+
+    <section class="catalog shell" aria-live="polite">
+      <div class="catalog-head">
+        <p id="resultCount">Chargement de la liste…</p>
+        <p class="sync-state" id="syncState">Connexion sécurisée</p>
+      </div>
+      <div id="catalogContent"></div>
+      <div class="empty-state hidden" id="emptyState">
+        <span>♡</span>
+        <h2>Aucun cadeau ne correspond.</h2>
+        <p>Essayez d’élargir les filtres ou de modifier votre recherche.</p>
+        <button class="button button-dark" id="emptyReset">Tout afficher</button>
+      </div>
+    </section>
+
+    <section class="closing shell">
+      <div class="closing-card">
+        <p class="eyebrow">Merci</p>
+        <h2>Quel que soit votre choix,<br><em>il comptera pour nous.</em></h2>
+        <p>Une autre idée vous semble plus juste ? Faites-vous confiance. Cette liste n’est qu’un guide pour vous aider.</p>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer shell">
+    <div class="brand-mark">M × N</div>
+    <p>Avec amour, Myriam & Nolan</p>
+    <p class="privacy-note">Les coordonnées transmises sont visibles uniquement dans notre espace privé.</p>
+  </footer>
+
+  <div id="modalRoot"></div>
+  <div class="toast-region" id="toastRegion" aria-live="polite"></div>
+
+  <script type="module" src="/app.js"></script>
+</body>
+</html>
