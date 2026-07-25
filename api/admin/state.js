@@ -9,7 +9,7 @@ export default async function handler(request, response) {
   if (!requireAdmin(request)) return json(response, 401, { error: 'Connexion requise.' });
   try {
     const { state } = await readRegistry();
-    return json(response, 200, { ...state, release: 'storage-v5-oidc-explicit' });
+    return json(response, 200, { ...state, release: 'storage-v6-oidc-auto' });
   } catch (error) {
     console.error('ADMIN_STATE_STORAGE_ERROR', error);
     const diagnostic = classifyStorageError(error);

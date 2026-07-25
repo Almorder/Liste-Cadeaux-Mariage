@@ -1,7 +1,3 @@
-import { AsyncLocalStorage } from 'node:async_hooks';
-
-const requestAuth = new AsyncLocalStorage();
-
 function readHeader(request, name) {
   const headers = request?.headers;
   if (!headers) return '';
@@ -9,21 +5,20 @@ function readHeader(request, name) {
   return String(headers[name.toLowerCase()] || headers[name] || '').trim();
 }
 
-export function withBlobRequest(request, callback) {
-  const oidcToken = readHeader(request, 'x-vercel-oidc-token') || String(process.env.VERCEL_OIDC_TOKEN || '').trim();
-  return requestAuth.run({ oidcToken }, callback);
-}
-
+// Le SDK @vercel/blob 2.6.1 gère OIDC automatiquement dans les Vercel Functions.
+// Il ne faut pas lui transmettre BLOB_STORE_ID ni le header OIDC comme options.
+// Pour un ancien store utilisant encore un token statique, on conserve uniquement
+// la compatibilité officielle via l'option `token`.
 export function blobAuthOptions() {
   const readWriteToken = String(process.env.BLOB_READ_WRITE_TOKEN || '').trim();
-  if (readWriteToken) return { token: readWriteToken };
+  return readWriteToken ? { token: readWriteToken } : {};
+}
 
-  const storeId = String(process.env.BLOB_STORE_ID || '').trim();
-  const oidcToken = String(requestAuth.getStore()?.oidcToken || '').trim();
-  return {
-    ...(storeId ? { storeId } : {}),
-    ...(oidcToken ? { oidcToken } : {}),
-  };
+// Conservé pour ne pas devoir modifier tous les handlers existants.
+// Le callback reste exécuté dans le contexte normal de la Vercel Function,
+// ce qui permet au SDK de récupérer automatiquement le jeton OIDC.
+export function withBlobRequest(_request, callback) {
+  return callback();
 }
 
 export function blobAuthDiagnostics(request) {
@@ -31,7 +26,7 @@ export function blobAuthDiagnostics(request) {
     storeIdPresent: Boolean(String(process.env.BLOB_STORE_ID || '').trim()),
     readWriteTokenPresent: Boolean(String(process.env.BLOB_READ_WRITE_TOKEN || '').trim()),
     oidcHeaderPresent: Boolean(readHeader(request, 'x-vercel-oidc-token')),
-    oidcEnvironmentPresent: Boolean(String(process.env.VERCEL_OIDC_TOKEN || '').trim()),
     vercelEnvironment: String(process.env.VERCEL_ENV || 'unknown'),
+    authMode: process.env.BLOB_READ_WRITE_TOKEN ? 'legacy-token' : 'automatic-oidc',
   };
 }

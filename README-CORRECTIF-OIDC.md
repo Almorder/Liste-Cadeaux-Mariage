@@ -27,7 +27,7 @@ Après le déploiement, ouvrir :
 Résultat attendu :
 
 - `"degradedMode": false`
-- `"release": "storage-v5-oidc-explicit"`
+- `"release": "storage-v6-oidc-auto"`
 
 Si le stockage échoue encore, la réponse contient `blobDiagnostics` avec uniquement des booléens sans secret :
 
