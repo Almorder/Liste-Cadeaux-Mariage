@@ -1,4 +1,4 @@
-import { BlobPreconditionFailedError, get, put } from '@vercel/blob';
+import { BlobPreconditionFailedError, get, head, put } from '@vercel/blob';
 import seed from '../data/seed.js';
 import { blobAuthOptions } from './blob-auth.js';
 
@@ -80,18 +80,45 @@ export function blobConfigurationStatus() {
   };
 }
 
-async function readRegistryBlob() {
+async function readRegistryBlob(attempts = 5) {
   try {
-    const result = await get(REGISTRY_PATH, blobOptions({ useCache: false }));
-    if (!result || result.statusCode === 404) return null;
-    if (result.statusCode !== 200 || !result.stream) {
-      throw new Error(`Lecture Blob inattendue (statut ${result.statusCode || 'inconnu'}).`);
+    for (let attempt = 0; attempt < attempts; attempt += 1) {
+      // `useCache: false` garantit que le JSON lu vient de l'origine Blob.
+      // Pour l'écriture conditionnelle, Vercel recommande de récupérer l'ETag
+      // canonique avec `head()` plutôt que de dépendre uniquement de la réponse GET.
+      const result = await get(REGISTRY_PATH, blobOptions({ useCache: false }));
+      if (!result || result.statusCode === 404) return null;
+      if (result.statusCode !== 200 || !result.stream) {
+        throw new Error(`Lecture Blob inattendue (statut ${result.statusCode || 'inconnu'}).`);
+      }
+
+      const text = await new Response(result.stream).text();
+      const metadata = await head(REGISTRY_PATH, blobAuthOptions());
+      const getEtag = result.blob?.etag || null;
+      const headEtag = metadata?.etag || null;
+
+      // Dans le cas très rare où la ressource change entre GET et HEAD,
+      // on relit jusqu'à obtenir un contenu et un ETag de la même version.
+      if (getEtag && headEtag && getEtag !== headEtag) {
+        const backoff = 40 * (attempt + 1) + Math.floor(Math.random() * 40);
+        console.warn('REGISTRY_READ_VERSION_CHANGED', {
+          attempt: attempt + 1,
+          attempts,
+          backoff,
+        });
+        await sleep(backoff);
+        continue;
+      }
+
+      return {
+        state: JSON.parse(text),
+        etag: headEtag || getEtag,
+      };
     }
-    const text = await new Response(result.stream).text();
-    return {
-      state: JSON.parse(text),
-      etag: result.blob?.etag || null,
-    };
+
+    const conflict = new Error('Impossible de lire une version stable de la liste. Merci de réessayer.');
+    conflict.code = 'REGISTRY_READ_CONFLICT';
+    throw conflict;
   } catch (error) {
     if (isMissingBlobError(error)) return null;
     throw error;
@@ -133,7 +160,7 @@ async function writeRegistry(state, etag) {
   }));
 }
 
-export async function updateRegistry(mutator, attempts = 8) {
+export async function updateRegistry(mutator, attempts = 12) {
   let lastError;
   for (let attempt = 0; attempt < attempts; attempt += 1) {
     const { state, etag } = await readRegistry();
@@ -148,7 +175,7 @@ export async function updateRegistry(mutator, attempts = 8) {
       lastError = error;
       // Une autre Function a écrit entre notre lecture et notre écriture.
       // On relit l'état le plus récent puis on rejoue la mutation.
-      const backoff = Math.min(800, 50 * (2 ** attempt)) + Math.floor(Math.random() * 75);
+      const backoff = Math.min(1200, 60 * (2 ** attempt)) + Math.floor(Math.random() * 90);
       console.warn('REGISTRY_ETAG_CONFLICT_RETRY', {
         attempt: attempt + 1,
         attempts,
