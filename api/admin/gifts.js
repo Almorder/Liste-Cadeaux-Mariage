@@ -1,9 +1,11 @@
+import { withBlobRequest } from '../../server/blob-auth.js';
 import { requireAdmin } from '../../server/auth.js';
 import { json, methodNotAllowed, parseJsonBody, safeError } from '../../server/http.js';
 import { recalculateGiftFromCommitments, updateRegistry } from '../../server/registry.js';
 import { cleanText, normalizeGift } from '../../server/validation.js';
 
 export default async function handler(request, response) {
+  return withBlobRequest(request, async () => {
   if (!requireAdmin(request)) return json(response, 401, { error: 'Connexion requise.' });
   try {
     if (request.method === 'PUT') {
@@ -36,4 +38,6 @@ export default async function handler(request, response) {
     const status = /obligatoires|doit commencer|introuvable|image doit|Identifiant/i.test(message) ? 400 : 500;
     return json(response, status, { error: status === 500 ? safeError(error) : message });
   }
+
+  });
 }

@@ -1,5 +1,6 @@
 import { BlobPreconditionFailedError, get, put } from '@vercel/blob';
 import seed from '../data/seed.js';
+import { blobAuthOptions } from './blob-auth.js';
 
 const REGISTRY_PATH = 'registry/state.json';
 const ACCESS = 'private';
@@ -13,7 +14,7 @@ function cloneSeed() {
 function blobOptions(extra = {}) {
   // Ne pas forcer de credential ici : le SDK choisit automatiquement
   // l'OIDC Vercel moderne ou BLOB_READ_WRITE_TOKEN pour les anciens stores.
-  return { access: ACCESS, ...extra };
+  return { access: ACCESS, ...blobAuthOptions(), ...extra };
 }
 
 export function classifyStorageError(error) {
@@ -54,6 +55,7 @@ function isMissingBlobError(error) {
 export function blobConfigurationStatus() {
   return {
     hasToken: Boolean(process.env.BLOB_READ_WRITE_TOKEN),
+    hasStoreId: Boolean(process.env.BLOB_STORE_ID),
     access: ACCESS,
     registryPath: REGISTRY_PATH,
   };

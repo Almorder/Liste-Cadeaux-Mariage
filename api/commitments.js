@@ -1,9 +1,11 @@
+import { withBlobRequest } from '../server/blob-auth.js';
 import crypto from 'node:crypto';
 import { json, methodNotAllowed, parseJsonBody, safeError } from '../server/http.js';
 import { activeVariant, classifyStorageError, publicState, recalculateGiftFromCommitments, updateRegistry } from '../server/registry.js';
 import { cleanMultiline, cleanText, finiteMoney, validateGuestIdentity, validateHoneypot } from '../server/validation.js';
 
 export default async function handler(request, response) {
+  return withBlobRequest(request, async () => {
   if (request.method !== 'POST') return methodNotAllowed(response, ['POST']);
   try {
     const body = parseJsonBody(request);
@@ -62,4 +64,6 @@ export default async function handler(request, response) {
     }
     return json(response, status, { error: message });
   }
+
+  });
 }

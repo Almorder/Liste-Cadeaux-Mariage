@@ -1,9 +1,11 @@
+import { withBlobRequest } from '../../server/blob-auth.js';
 import { requireAdmin } from '../../server/auth.js';
 import { json, methodNotAllowed, parseJsonBody, safeError } from '../../server/http.js';
 import { updateRegistry } from '../../server/registry.js';
 import { cleanText } from '../../server/validation.js';
 
 export default async function handler(request, response) {
+  return withBlobRequest(request, async () => {
   if (request.method !== 'PATCH') return methodNotAllowed(response, ['PATCH']);
   if (!requireAdmin(request)) return json(response, 401, { error: 'Connexion requise.' });
   try {
@@ -21,4 +23,6 @@ export default async function handler(request, response) {
     const message = error instanceof Error ? error.message : safeError(error);
     return json(response, /introuvable/i.test(message) ? 400 : 500, { error: message });
   }
+
+  });
 }

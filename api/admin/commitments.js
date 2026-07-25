@@ -1,9 +1,11 @@
+import { withBlobRequest } from '../../server/blob-auth.js';
 import { requireAdmin } from '../../server/auth.js';
 import { json, methodNotAllowed, parseJsonBody, safeError } from '../../server/http.js';
 import { recalculateGiftFromCommitments, updateRegistry } from '../../server/registry.js';
 import { cleanText, finiteMoney } from '../../server/validation.js';
 
 export default async function handler(request, response) {
+  return withBlobRequest(request, async () => {
   if (request.method !== 'PATCH') return methodNotAllowed(response, ['PATCH']);
   if (!requireAdmin(request)) return json(response, 401, { error: 'Connexion requise.' });
   try {
@@ -27,4 +29,6 @@ export default async function handler(request, response) {
     const message = error instanceof Error ? error.message : 'Modification impossible.';
     return json(response, /introuvable|invalide/i.test(message) ? 400 : 500, { error: message || safeError(error) });
   }
+
+  });
 }
