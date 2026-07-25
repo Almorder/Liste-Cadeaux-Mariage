@@ -26,6 +26,13 @@ Le projet utilise :
 
 L’adresse e-mail et le mot de passe administrateur sont uniquement enregistrés dans les variables d’environnement Vercel. Ils ne doivent jamais être ajoutés au dépôt GitHub.
 
+
+## Compatibilité avec Vercel Hobby
+
+Cette version contient exactement 12 fonctions Serverless, soit la limite du plan Hobby.
+Le précédent endpoint de diagnostic `/api/health` a été retiré pour respecter cette limite.
+La liste publique peut être testée avec `/api/public`.
+
 ## Déploiement Vercel
 
 ### 1. Importer le dépôt

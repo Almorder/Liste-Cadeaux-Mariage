@@ -13,7 +13,7 @@ export default async function handler(request, response) {
     return json(response, 200, {
       ...publicState(structuredClone(seed)),
       degradedMode: true,
-      warning: 'La liste est visible, mais les réservations sont momentanément indisponibles tant que le stockage Vercel n’est pas connecté.',
+      warning: 'La liste est visible en lecture seule, mais le stockage privé Vercel est momentanément inaccessible.',
     });
   }
 }

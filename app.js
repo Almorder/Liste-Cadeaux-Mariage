@@ -403,7 +403,7 @@ function closeModal() {
 
 function openParticipation(gift, mode) {
   if (state.demo) {
-    toast('La prévisualisation locale n’enregistre aucune participation.', true);
+    toast('Le stockage partagé est temporairement indisponible : cette participation n’a pas été enregistrée.', true);
     return;
   }
   const max = remaining(gift);
@@ -482,7 +482,7 @@ function openParticipation(gift, mode) {
 
 function openContact(gift) {
   if (state.demo) {
-    toast('La prévisualisation locale n’enregistre aucune demande.', true);
+    toast('Le stockage partagé est temporairement indisponible : cette demande n’a pas été enregistrée.', true);
     return;
   }
   dom.modalRoot.innerHTML = `

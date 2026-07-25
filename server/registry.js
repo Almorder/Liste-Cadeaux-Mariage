@@ -11,11 +11,14 @@ function cloneSeed() {
 }
 
 function blobOptions(extra = {}) {
-  return {
-    access: ACCESS,
-    token: process.env.BLOB_READ_WRITE_TOKEN,
-    ...extra,
-  };
+  // Les nouveaux projets Vercel Blob utilisent OIDC par défaut.
+  // On ne transmet un token statique que lorsqu'il existe réellement ;
+  // sinon le SDK récupère automatiquement le jeton OIDC de la Function.
+  const options = { access: ACCESS, ...extra };
+  if (process.env.BLOB_READ_WRITE_TOKEN) {
+    options.token = process.env.BLOB_READ_WRITE_TOKEN;
+  }
+  return options;
 }
 
 function isMissingBlobError(error) {
@@ -35,7 +38,7 @@ export function blobConfigurationStatus() {
 
 async function readRegistryBlob() {
   try {
-    const result = await get(REGISTRY_PATH, blobOptions());
+    const result = await get(REGISTRY_PATH, blobOptions({ useCache: false }));
     if (!result || result.statusCode === 404) return null;
     if (result.statusCode !== 200 || !result.stream) {
       throw new Error(`Lecture Blob inattendue (statut ${result.statusCode || 'inconnu'}).`);
@@ -70,9 +73,8 @@ async function initializeRegistry() {
 }
 
 export async function readRegistry() {
-  if (!process.env.BLOB_READ_WRITE_TOKEN) {
-    throw new Error('BLOB_READ_WRITE_TOKEN est absent. Connectez un Vercel Blob Store privé au projet et redéployez.');
-  }
+  // Compatible avec les deux modes Vercel : ancien token statique et OIDC.
+  // Le SDK gère l'authentification OIDC automatiquement dans les Functions.
   return (await readRegistryBlob()) || initializeRegistry();
 }
 

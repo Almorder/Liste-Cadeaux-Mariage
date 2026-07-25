@@ -516,7 +516,7 @@ async function loadAdmin() {
     renderApp('products');
   } catch (error) {
     if (error.status === 401) renderLogin();
-    else renderLogin(`${error.message} Diagnostic : ouvre /api/health dans un nouvel onglet.`);
+    else renderLogin(`${error.message} Le stockage privé Vercel n’est pas accessible. Vérifie que le Blob Store privé est bien connecté au projet, puis redéploie.`);
   }
 }
 
