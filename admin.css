@@ -251,3 +251,6 @@
   .coordination-invite-row .button { width: 100%; }
 }
 .coordination-person-main small { overflow-wrap: anywhere; }
+
+.admin-help { display: block; margin-top: 12px; color: var(--muted); line-height: 1.5; }
+.field small { display: block; margin-top: 7px; color: var(--muted); line-height: 1.45; }

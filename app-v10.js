@@ -245,7 +245,7 @@ function giftCard(item) {
           </div>` : ''}
         ${item.kind === 'group' ? `<div class="variant-note">Une seule option sera retenue. Les autres se bloquent dès qu’une variante est choisie.</div>` : ''}
         <div class="gift-meta">
-          <div class="price-block"><strong>${cardPrice(item)}</strong><small>${collective ? 'Participation possible' : 'Cadeau complet'}</small></div>
+          <div class="price-block"><strong>${cardPrice(item)}</strong><small>Prix indicatif · ${collective ? 'Participation possible' : 'Cadeau complet'}</small></div>
           <button class="card-link" type="button" aria-label="Voir ${escapeHtml(item.name)}">↗</button>
         </div>
       </div>
@@ -363,7 +363,7 @@ function openGift(itemId, selectedGiftId = null) {
             <p>${escapeHtml(gift.description || item.description || '')}</p>
             ${variantSelector}
             <div class="detail-list">
-              <div class="detail-row"><span>Prix</span><strong>${formatMoney(gift.price)}</strong></div>
+              <div class="detail-row"><span>Prix indicatif</span><strong>${formatMoney(gift.price)}</strong></div>
               <div class="detail-row"><span>Pour</span><strong>${escapeHtml(gift.beneficiary)}</strong></div>
               <div class="detail-row"><span>Importance</span><strong>${escapeHtml(gift.priority)}</strong></div>
               ${gift.size ? `<div class="detail-row"><span>Format</span><strong>${escapeHtml(gift.size)}</strong></div>` : ''}
@@ -372,7 +372,9 @@ function openGift(itemId, selectedGiftId = null) {
             </div>
             ${progressBlock}
             <div class="product-actions">${actions}</div>
-            ${gift.url ? `<a class="button button-light merchant-link" href="${escapeHtml(gift.url)}" target="_blank" rel="noopener noreferrer">Voir le produit chez le marchand ↗</a>` : ''}
+            ${gift.url ? `
+              <a class="button button-light merchant-link" href="${escapeHtml(gift.url)}" target="_blank" rel="noopener noreferrer">Voir une référence marchand ↗</a>
+              <p class="merchant-note">Ce lien sert uniquement à retrouver la référence. Le prix peut avoir évolué : vous pouvez comparer les marchands et acheter le produit au meilleur endroit.</p>` : ''}
           </div>
         </div>
       </div>

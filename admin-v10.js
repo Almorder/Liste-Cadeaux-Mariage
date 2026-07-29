@@ -593,8 +593,9 @@ function renderSettings() {
     </form>
     <div class="admin-card">
       <h2>Sauvegarde</h2>
-      <p>Téléchargez régulièrement une copie JSON de toute la liste, y compris les participations et les demandes privées.</p>
-      <button class="button button-light" id="settingsExport">Télécharger une sauvegarde</button>
+      <p>Le téléchargement relit directement la dernière version enregistrée sur le serveur. Il contient les cadeaux, les modifications, les participations et les demandes privées.</p>
+      <button class="button button-light" id="settingsExport">Télécharger la dernière sauvegarde serveur</button>
+      <small class="admin-help">Aucun fichier n’est généré si le stockage en ligne est inaccessible : vous ne risquez donc pas de sauvegarder silencieusement une ancienne liste locale.</small>
     </div>`;
   document.getElementById('settingsForm').addEventListener('submit', saveSettings);
   document.getElementById('settingsExport').addEventListener('click', exportState);
@@ -627,7 +628,7 @@ function openGiftEditor(id = null) {
         <div class="editor-grid">
           <div class="field span-2"><label>Nom du produit</label><input name="name" value="${escapeHtml(gift.name)}" required></div>
           <div class="field"><label>Marque</label><input name="brand" value="${escapeHtml(gift.brand)}"></div>
-          <div class="field"><label>Prix en euros</label><input name="price" type="number" min="0" step=".01" value="${Number(gift.price || 0)}" required></div>
+          <div class="field"><label>Prix indicatif en euros</label><input name="price" type="number" min="0" step=".01" value="${Number(gift.price || 0)}" required><small>Tarif repère affiché aux invités. Il n’oblige pas à acheter chez le marchand indiqué.</small></div>
           <div class="field"><label>Catégorie</label><select name="category">${CATEGORY_ORDER.map((category) => option(category, gift.category)).join('')}</select></div>
           <div class="field"><label>Pour</label><select name="beneficiary">${['Myriam', 'Nolan', 'Les deux'].map((value) => option(value, gift.beneficiary)).join('')}</select></div>
           <div class="field"><label>Importance</label><select name="priority">${['Haute', 'Moyenne', 'Basique'].map((value) => option(value, gift.priority)).join('')}</select></div>
@@ -637,7 +638,7 @@ function openGiftEditor(id = null) {
           <div class="field"><label>Groupe de variantes</label><input name="variantGroup" list="variantGroups" value="${escapeHtml(gift.variantGroup || '')}" placeholder="Laisser vide si unique"><datalist id="variantGroups">${groupKeys.map((key) => `<option value="${escapeHtml(key)}">`).join('')}</datalist></div>
           <div class="field"><label>Montant déjà réuni</label><input name="collected" type="number" min="0" step=".01" value="${Number(gift.collected || 0)}"></div>
           <div class="field span-2"><label>Description</label><textarea name="description">${escapeHtml(gift.description || '')}</textarea></div>
-          <div class="field span-2"><label>Lien marchand</label><input name="url" type="url" value="${escapeHtml(gift.url || '')}" placeholder="https://…"></div>
+          <div class="field span-2"><label>Lien vers une référence marchand</label><input name="url" type="url" value="${escapeHtml(gift.url || '')}" placeholder="https://…"><small>Ce lien aide uniquement à identifier le bon modèle. Les invités seront invités à comparer les vendeurs et les prix.</small></div>
           <div class="field span-2">
             <label>Image du produit</label>
             <div class="image-editor">
@@ -803,13 +804,48 @@ async function saveSettings(event) {
   }
 }
 
-function exportState() {
-  const blob = new Blob([JSON.stringify(app.state, null, 2)], { type: 'application/json' });
-  const link = document.createElement('a');
-  link.href = URL.createObjectURL(blob);
-  link.download = `liste-mariage-sauvegarde-${new Date().toISOString().slice(0, 10)}.json`;
-  link.click();
-  setTimeout(() => URL.revokeObjectURL(link.href), 1000);
+async function exportState(event) {
+  const button = event?.currentTarget instanceof HTMLButtonElement ? event.currentTarget : null;
+  const originalLabel = button?.textContent || '';
+  if (button) {
+    button.disabled = true;
+    button.textContent = 'Lecture du serveur…';
+  }
+  try {
+    const freshState = await api(`/api/admin/state?export=${Date.now()}`);
+    if (!Array.isArray(freshState.gifts) || !Array.isArray(freshState.commitments) || !freshState.updatedAt) {
+      throw new Error('La réponse du serveur est incomplète. Aucune sauvegarde n’a été téléchargée.');
+    }
+    app.state = freshState;
+    const exportedAt = new Date().toISOString();
+    const snapshot = {
+      ...freshState,
+      exportMetadata: {
+        source: 'server',
+        exportedAt,
+        registryUpdatedAt: freshState.updatedAt,
+        giftCount: freshState.gifts.length,
+        commitmentCount: freshState.commitments.length,
+        contactCount: Array.isArray(freshState.contacts) ? freshState.contacts.length : 0,
+      },
+    };
+    const blob = new Blob([JSON.stringify(snapshot, null, 2)], { type: 'application/json' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = `liste-mariage-sauvegarde-serveur-${exportedAt.slice(0, 10)}.json`;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    setTimeout(() => URL.revokeObjectURL(link.href), 1000);
+    toast(`Sauvegarde serveur téléchargée · ${freshState.gifts.length} cadeaux · mise à jour ${date(freshState.updatedAt)}.`);
+  } catch (error) {
+    toast(`${error.message} La sauvegarde n’a pas été créée.`, true);
+  } finally {
+    if (button) {
+      button.disabled = false;
+      button.textContent = originalLabel;
+    }
+  }
 }
 
 async function logout() {
